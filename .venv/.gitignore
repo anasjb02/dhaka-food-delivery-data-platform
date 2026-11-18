@@ -1,0 +1,10 @@
+.env
+*.env
+!example.env
+data/
+logs/
+target/
+dbt_packages/
+.venv/
+__pycache__/
+.DS_Store
