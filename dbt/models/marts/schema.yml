@@ -1,0 +1,18 @@
+version: 2
+models:
+  - name: fct_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: restaurant_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_restaurants'), field: restaurant_id}
+  - name: dim_restaurants
+    columns:
+      - name: restaurant_id
+        data_tests: [unique, not_null]
+  - name: dim_customer
+    columns:
+      - name: user_id
+        data_tests: [unique, not_null]

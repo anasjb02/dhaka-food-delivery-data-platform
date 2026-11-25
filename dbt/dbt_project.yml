@@ -2,3 +2,10 @@ name: bd_food
 version: "1.0"
 profile: bd_food
 model-paths: ["models"]
+test-paths: ["tests"]
+models:
+  bd_food:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
