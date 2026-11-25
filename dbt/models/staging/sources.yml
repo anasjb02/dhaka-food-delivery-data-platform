@@ -9,3 +9,6 @@ sources:
       - name: menu
       - name: order_items
       - name: reviews
+  - name: ai
+    tables:
+      - name: review_enriched
