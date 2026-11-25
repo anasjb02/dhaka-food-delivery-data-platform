@@ -1,7 +1,6 @@
 # Dhaka Food Delivery Data Platform
 
-An end-to-end batch data pipeline on a synthetic Bangladesh food-delivery dataset: raw CSVs → DuckDB → dbt (staging, dimensions, facts, marts) → Airflow, with a local-LLM enrichment step that turns free-text reviews into structured sentiment and topic columns.
-
+An end-to-end batch data pipeline on a synthetic Bangladesh food-delivery dataset: raw CSVs → DuckDB → dbt (staging, dimensions, facts, marts) → Airflow, plus a local-LLM layer: review enrichment, text-to-SQL over the marts, and a RAG chat over customer reviews. Everything runs locally and for free.
 
 ## Architecture
 
@@ -9,25 +8,44 @@ CSV files → DuckDB `raw` schema → dbt staging views → dbt gold tables → 
 
 `load_raw → dbt_build_core → enrich_reviews → dbt_build_ai`
 
+Two Streamlit apps sit on top: `ai/text_to_sql.py` (chat with the warehouse) and `ai/rag_chat.py` (chat with the reviews).
+
 ## Highlights
 
-- **Bangladeshi dataset.** Wrote a Python generator (`scripts/generate_bd_data.py`) for 200,000 orders, 18,745 reviews, 3,000 restaurants and 20,000 users across Dhaka, Chattogram, Sylhet, Khulna and Rajshahi, with BDT prices, bKash/Nagad/cash-on-delivery payments, lunch and dinner peaks, and monsoon delivery delays.
-- **Fully local, free stack.** DuckDB handles storage and transformation, so anyone can run it at no cost.
-- **Local LLM.** Llama 3.2 3B via Ollama classifies review sentiment and topic. Output is idempotent, so reviews are never processed twice.
-- **My own models.** Incremental `fct_orders`; marts for daily city revenue (7-day rolling GMV window function), restaurant ranking per city, delivery SLA (p50/p90) and review insights.
-- **Data quality.** 19 dbt tests (uniqueness, not-null, relationships, accepted values) plus a custom revenue reconciliation test.
+- **Bangladeshi dataset.** A Python generator (`scripts/generate_bd_data.py`) creates 200,000 orders, 18,745 reviews, 3,000 restaurants and 20,000 users across Dhaka, Chattogram, Sylhet, Khulna and Rajshahi, with BDT prices, bKash/Nagad/cash-on-delivery payments, lunch and dinner peaks, and monsoon delivery delays.
+- **Fully local, free stack.** DuckDB for storage and transformation, Ollama for all models.
+- **dbt models.** Incremental `fct_orders`; marts for daily city revenue (7-day rolling GMV window function), restaurant ranking per city, delivery SLA (p50/p90) and review insights.
+- **Data quality.** 19 dbt tests (uniqueness, not-null, relationships, accepted values, and a custom revenue reconciliation test).
+- **LLM enrichment.** Llama 3.2 3B classifies review sentiment and topic (420 reviews enriched). Idempotent: reviews are never processed twice.
+- **Text-to-SQL and RAG.** See the sections below.
+
+## Project structure
+
+```
+airflow/   Dockerfile, docker-compose.yaml, dags/bd_food_pipeline.py
+ai/        enrich_reviews.py, embed_reviews.py, rag_chat.py, text_to_sql.py
+dbt/       models/staging, models/marts, tests/
+scripts/   generate_bd_data.py, load_raw.py
+docs/      screenshots
+```
 
 ## Run it
 
 ```bash
-python -m venv .venv && source .venv/Scripts/activate
-pip install dbt-duckdb duckdb pandas requests
+python -m venv .venv && source .venv/Scripts/activate   # Linux/macOS: .venv/bin/activate
+pip install dbt-duckdb duckdb pandas requests streamlit
+ollama pull llama3.2:3b && ollama pull qwen2.5-coder:3b && ollama pull nomic-embed-text
+
 python scripts/generate_bd_data.py
 python scripts/load_raw.py
-cd dbt && dbt build --exclude tag:ai --profiles-dir .
+cd dbt && dbt build --exclude tag:ai --profiles-dir . && cd ..
+python ai/enrich_reviews.py
+cd dbt && dbt build --select tag:ai --profiles-dir . && cd ..
+python ai/embed_reviews.py
+streamlit run ai/text_to_sql.py      # or ai/rag_chat.py
 ```
 
-For the full pipeline: `cd airflow && docker compose up -d --build`, open http://localhost:8082, and trigger `bd_food_pipeline`. Ollama (with `llama3.2:3b`) must be running for the enrichment step.
+Full pipeline with Airflow: `cd airflow && docker compose up -d --build`, get the admin password with `docker compose logs airflow | grep -i "password for user"`, open http://localhost:8082, and trigger `bd_food_pipeline`. Ollama must be running for the enrichment step.
 
 ## Screenshots
 
@@ -39,21 +57,9 @@ For the full pipeline: `cd airflow && docker compose up -d --build`, open http:/
 
 ![dbt lineage](docs/screenshots/dbt_lineage.png)
 
-## Challenges and lessons
+## Chat with the warehouse (text-to-SQL)
 
-- DuckDB misdetected the CSV header on a one-column table; fixed by declaring `header=true` explicitly.
-- Installing dbt next to Airflow broke Airflow's dependencies; solved by putting dbt in its own virtualenv inside the Docker image.
-- A shared dbt cache between Windows and the Linux container caused parse errors; disabled partial parsing.
-- Docker filled the system drive; learned to monitor disk usage and clean images and build cache.
-- The 3B model assigns one topic per review, so multi-topic reviews are only partly captured. A larger model or multi-label output would improve this.
-
-## Limitations
-
-The data is synthetic, so findings illustrate the pipeline, not real-world behaviour. The LLM labels were spot-checked, not formally evaluated.
-
-## Chat with the warehouse
-
-`ai/text_to_sql.py` is a Streamlit app that turns English questions into DuckDB SQL using a local model (qwen2.5-coder). It shows the generated SQL, only allows a single read-only `SELECT`, and retries once with the error message if the query fails. Run it with `streamlit run ai/text_to_sql.py`.
+`ai/text_to_sql.py` is a Streamlit app that turns English questions into DuckDB SQL using a local model (qwen2.5-coder). It shows the generated SQL, only allows a single read-only `SELECT`, and retries once with the error message if the query fails.
 
 **Before schema hints:** the 3B model joined two tables and wrote an ambiguous query that failed.
 
@@ -70,8 +76,6 @@ Known limitation: small models can pick the wrong table. For example, "average d
 
 `ai/embed_reviews.py` embeds review text with a local model (nomic-embed-text) into DuckDB (3,200 reviews embedded). `ai/rag_chat.py` embeds the question, retrieves similar reviews by cosine similarity (optionally filtered by city), removes near-duplicate reviews, and asks a local Llama model to answer using only those reviews, with numbered sources.
 
-Run it with `python ai/embed_reviews.py`, then `streamlit run ai/rag_chat.py`.
-
 Filtering by city (Dhaka only):
 
 ![Rain question, Dhaka](docs/screenshots/rag_rain_dhaka.png)
@@ -86,4 +90,15 @@ After (distinct sources):
 
 ![After](docs/screenshots/rag_complaints_after.png)
 
-Limitations: the reviews are synthetic and built from a small set of sentence templates, so results are less varied than real reviews. Small local models can also overstate conclusions, so the app shows numbered sources for checking.
+## Challenges and lessons
+
+- DuckDB misdetected the CSV header on a one-column table; fixed by declaring `header=true` explicitly.
+- Installing dbt next to Airflow broke Airflow's dependencies; solved by putting dbt in its own virtualenv inside the Docker image.
+- The `latest` Airflow image failed on a dependency conflict; pinning a released version (3.3.1) fixed it.
+- A shared dbt cache between Windows and the Linux container caused parse errors; disabled partial parsing.
+- Docker filled the system drive; learned to monitor disk usage and clean images and build cache.
+- The 3B model assigns one topic per review, so multi-topic reviews are only partly captured. A larger model or multi-label output would improve this.
+
+## Limitations
+
+The data is synthetic and built from a small set of sentence templates, so findings illustrate the pipeline, not real-world behaviour. LLM labels were spot-checked, not formally evaluated, and small local models can overstate conclusions, which is why the apps show their sources or SQL.
