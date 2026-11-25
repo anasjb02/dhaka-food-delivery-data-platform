@@ -8,3 +8,5 @@ dbt_packages/
 .venv/
 __pycache__/
 .DS_Store
+*.duckdb
+.user.yml
