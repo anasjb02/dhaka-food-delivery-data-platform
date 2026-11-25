@@ -50,3 +50,18 @@ For the full pipeline: `cd airflow && docker compose up -d --build`, open http:/
 ## Limitations
 
 The data is synthetic, so findings illustrate the pipeline, not real-world behaviour. The LLM labels were spot-checked, not formally evaluated.
+
+## Chat with the warehouse
+
+`ai/text_to_sql.py` is a Streamlit app that turns English questions into DuckDB SQL using a local model (qwen2.5-coder). It shows the generated SQL, only allows a single read-only `SELECT`, and retries once with the error message if the query fails. Run it with `streamlit run ai/text_to_sql.py`.
+
+**Before schema hints:** the 3B model joined two tables and wrote an ambiguous query that failed.
+
+![Failed query before schema hints](docs/screenshots/text_to_sql_before.png)
+
+**After adding table descriptions, rules and examples to the prompt:** correct answers.
+
+![Top 5 restaurants in Dhaka](docs/screenshots/text_to_sql_1.png)
+![Highest cancel rate](docs/screenshots/text_to_sql_2.png)
+
+Known limitation: small models can pick the wrong table. For example, "average delivery time per city" averages per-restaurant averages instead of weighting by orders.
