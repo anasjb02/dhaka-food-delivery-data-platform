@@ -1,0 +1,11 @@
+services:
+  airflow:
+    build: .
+    command: ["airflow", "standalone"]
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ..:/opt/project
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
