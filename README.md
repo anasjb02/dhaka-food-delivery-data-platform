@@ -65,3 +65,25 @@ The data is synthetic, so findings illustrate the pipeline, not real-world behav
 ![Highest cancel rate](docs/screenshots/text_to_sql_2.png)
 
 Known limitation: small models can pick the wrong table. For example, "average delivery time per city" averages per-restaurant averages instead of weighting by orders.
+
+## Chat with your reviews (RAG)
+
+`ai/embed_reviews.py` embeds review text with a local model (nomic-embed-text) into DuckDB (3,200 reviews embedded). `ai/rag_chat.py` embeds the question, retrieves similar reviews by cosine similarity (optionally filtered by city), removes near-duplicate reviews, and asks a local Llama model to answer using only those reviews, with numbered sources.
+
+Run it with `python ai/embed_reviews.py`, then `streamlit run ai/rag_chat.py`.
+
+Filtering by city (Dhaka only):
+
+![Rain question, Dhaka](docs/screenshots/rag_rain_dhaka.png)
+
+**A retrieval issue I found:** the top matches were near-duplicate reviews (sometimes the same sentences in a different order), so one review was repeated and the answer was skewed. I added order-insensitive deduplication and a wider candidate pool, which gave varied sources.
+
+Before (duplicate sources):
+
+![Before](docs/screenshots/rag_complaints.png)
+
+After (distinct sources):
+
+![After](docs/screenshots/rag_complaints_after.png)
+
+Limitations: the reviews are synthetic and built from a small set of sentence templates, so results are less varied than real reviews. Small local models can also overstate conclusions, so the app shows numbered sources for checking.
