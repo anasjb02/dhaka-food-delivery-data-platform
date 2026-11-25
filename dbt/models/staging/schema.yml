@@ -1,0 +1,30 @@
+version: 2
+models:
+  - name: stg_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: restaurant_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('stg_restaurants'), field: restaurant_id}
+      - name: user_id
+        data_tests:
+          - relationships:
+              arguments: {to: ref('stg_users'), field: user_id}
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments: {values: ['Delivered', 'Cancelled']}
+  - name: stg_restaurants
+    columns:
+      - name: restaurant_id
+        data_tests: [unique, not_null]
+  - name: stg_users
+    columns:
+      - name: user_id
+        data_tests: [unique, not_null]
+  - name: stg_reviews
+    columns:
+      - name: review_id
+        data_tests: [unique, not_null]
