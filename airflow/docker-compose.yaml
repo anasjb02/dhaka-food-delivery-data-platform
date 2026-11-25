@@ -9,3 +9,5 @@ services:
       - ..:/opt/project
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      OLLAMA_URL: "http://host.docker.internal:11434/api/chat"
+      SAMPLE_N: "50"

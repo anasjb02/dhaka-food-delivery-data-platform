@@ -5,7 +5,7 @@ import duckdb, requests
 DB = "dbt/warehouse.duckdb"
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 SAMPLE_N = int(os.getenv("SAMPLE_N", "200"))
-URL = "http://localhost:11434/api/chat"
+URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 TOPICS = ["food_quality", "delivery_speed", "packaging", "price_value",
           "portion_size", "order_accuracy", "service", "other"]
 PROMPT = ("You classify food delivery reviews. Reply with JSON only, like "
