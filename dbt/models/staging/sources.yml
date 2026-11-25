@@ -1,0 +1,11 @@
+version: 2
+sources:
+  - name: raw
+    tables:
+      - name: orders
+      - name: restaurants
+      - name: users
+      - name: food
+      - name: menu
+      - name: order_items
+      - name: reviews

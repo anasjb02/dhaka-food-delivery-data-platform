@@ -1,0 +1,4 @@
+name: bd_food
+version: "1.0"
+profile: bd_food
+model-paths: ["models"]
